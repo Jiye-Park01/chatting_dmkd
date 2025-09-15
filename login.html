@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>로그인</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+</head>
+<body class="p-4" style="padding-top: 180px !important;">
+    <div class="container" style="max-width:420px;">
+        <h3 class="mb-3">로그인</h3>
+        <form method="post" action="/login">
+            <div class="form-group">
+                <label>이메일</label>
+                <input class="form-control" type="email" name="email" required />
+            </div>
+            <div class="form-group">
+                <label>비밀번호</label>
+                <input class="form-control" type="password" name="password" required />
+            </div>
+            <button class="btn btn-primary btn-block" type="submit">로그인</button>
+            <a class="btn btn-link btn-block" href="/signup">회원가입</a>
+        </form>
+        
+        <!-- DMKD Logo -->
+        <div class="text-center mt-5">
+            <a href="https://lab.researchwho.com/DSWU-DMKD/" target="_blank" 
+               onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'"
+               style="transition: opacity 0.3s;">
+                <img src="/DMKD_logo.jpg" alt="DMKD Logo" style="max-width: 200px; height: auto; border-radius: 5px;" />
+            </a>
+        </div>
+    </div>
+</body>
+</html>
+

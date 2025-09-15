@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width; initial-scale=1" />
+    <title>자유로운 잡담</title>
+    <link
+        rel="stylesheet"
+        href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css"
+        integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh"
+        crossorigin="anonymous"
+    />
+    <script
+        src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js"
+        integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo"
+        crossorigin="anonymous"
+    ></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <link rel="stylesheet" type="text/css" href="css/style.css" />
+</head>
+<body>
+    <div class="fullscreen">
+        <div class="top_screen">
+            <iframe width="100%" height="100%" src="https://www.youtube-nocookie.com/embed/40At-sysgzA?rel=0" title="Playlist | K-POP Piano Playlist" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+        </div>
+        <div class="main_content">
+            <div class="left_screen">
+                <div class="notification">
+                    <span
+                        class="closebtn"
+                        onclick="this.parentElement.style.display='none';"
+                        >&times;
+                    </span>
+                    
+                    <strong>Notification</strong> <span class="date-placeholder"></span> 수업시간에 참여해준 여러분들을 환영합니다. <br />
+                </div>
+                <div class="notification">
+                    <span
+                        class="closebtn"
+                        onclick="this.parentElement.style.display='none';"
+                        >&times;</span
+                    >
+                    <strong>Notification</strong> <span class="date-placeholder"></span> LMS 에서 수업자료 다운받아서 준비해주세요. <br />
+                </div>
+                <div id="chatBox">
+                    <div id="chatContent"></div>
+                </div>
+                <form class="form_text">
+                    <input type="text" id="myChat" placeholder="어떤 얘기여도 좋습니다!" class="form-control" />
+                    <button type="submit" id="btn-primary" class="btn btn-primary">Send Text</button>
+                </form>
+                <form class="form_image">
+                    <div class="input-group">
+                        <input type="file" id="fileInput" class="form-control" />
+                        <div class="input-group-append">
+                            <button type="submit" id="btn-primary-image" class="btn btn-primary">Send Image</button>
+                        </div>
+                    </div>
+                    <div id="imagePreviewContainer">
+                        <img id="imagePreview" style="display: none; max-width: 100px; max-height: 100px; margin-top: 10px;" />
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script>
+    $(document).ready(function () {
+        // 오늘 날짜를 설정하는 함수
+        function updateDate() {
+            var today = new Date();
+            var date = today.getFullYear() + '. ' + (today.getMonth() + 1) + '. ' + today.getDate() + '.';
+            // 모든 date-placeholder 클래스를 가진 요소를 찾아 날짜로 업데이트
+            $('.date-placeholder').text(date);
+        }
+        // 페이지 로드 시 날짜 업데이트
+        updateDate();
+    });
+
+        $(function () {
+            var socket = io();
+            var currentReplyTo = null;
+            var currentUser = makeRandomName();
+
+            socket.emit('login', { name: currentUser });
+
+            socket.on('login', function (data) {
+                var msgLine = $('<div class="msgLine">');
+                var msgBox = $('<div class="msgBox_login">');
+                msgBox.append('<strong>' + data.name + '</strong> 님이 채팅방에 참여하였습니다 ' + data.enter_time);
+                msgBox.css('display', 'inline-block');
+                msgLine.append(msgBox);
+                $('#chatContent').append(msgLine);
+                updateScroll();
+            });
+
+            socket.on('chat', function (data) {
+                var msgTime = new Date(data.msg_time);
+                var formattedTime =
+                    // msgTime.toLocaleDateString("ko-KR", {
+                    //     month: "numeric",
+                    //     day: "numeric"
+                    // }) +
+                    // " " +
+                    msgTime.toLocaleTimeString("ko-KR", {
+                        hour: "numeric",
+                        minute: "numeric",
+                        hour12: true
+                    });
+                var msgLine = $('<div class="msgLine">');
+                var msgBox = $('<div class="msgBox" id="msg-' + data.msg_time + '">');
+                msgBox.append(data.msg + '<div class="msgBox_from_and_time">' + '(From. ' + data.name + ' 학생)' + ' ' + formattedTime + '</div>');
+                msgBox.css('display', 'inline-block');
+                var reactionButtons = $('<div class="reaction-buttons">');
+                var likeCount = $('<span class="like-count" id="like-count-' + data.msg_time + '">0</span>');
+                var likeBtn = $('<span class="like-btn">👍</span>').click(function () {
+                    handleReaction(data.msg_time, 'like');
+                });
+                var dislikeCount = $('<span class="dislike-count" id="dislike-count-' + data.msg_time + '">0</span>');
+                var dislikeBtn = $('<span class="dislike-btn">👎</span>').click(function () {
+                    handleReaction(data.msg_time, 'dislike');
+                });
+                var commentImg = $('<img src="commentImg.png" class="commentImg" alt="comment">').click(function () {
+                    toggleReplyMode(data.msg_time, data.name);
+                });
+                reactionButtons.append(likeCount).append(likeBtn).append(dislikeCount).append(dislikeBtn).append(commentImg);
+                msgBox.append(reactionButtons);
+                msgLine.append(msgBox);
+                $('#chatContent').append(msgLine);
+                $('#chatContent').append('<div class="replyContainer" id="reply-container-' + data.msg_time + '"></div>'); // Add reply container
+                updateScroll();
+            });
+
+            // 이미지 메시지 수신 처리
+            socket.on('base64', function (data) {
+                var msgLine = $('<div class="msgLine">');
+                var msgTime = new Date(data.msg_time);
+                var formattedTime = msgTime.toLocaleString();
+                var msgBox = $('<div class="msgBox" id="msg-' + data.msg_time + '">');
+                msgBox.append('<div class="msgBox_from_and_time">(From. ' + data.name + ' 학생) ' + formattedTime + '</div>');
+                var img = $('<img>');
+                var img_type = base64FileHeaderMapper(data.msg);
+                img.attr('src', 'data:img/' + img_type + ';base64,' + data.msg);
+                msgBox.append(img);
+                msgBox.css('display', 'inline-block');
+                var reactionButtons = $('<div class="reaction-buttons">');
+                var likeCount = $('<span class="like-count" id="like-count-' + data.msg_time + '">0</span>');
+                var likeBtn = $('<span class="like-btn">👍</span>').click(function () {
+                    handleReaction(data.msg_time, 'like');
+                });
+                var dislikeCount = $('<span class="dislike-count" id="dislike-count-' + data.msg_time + '">0</span>');
+                var dislikeBtn = $('<span class="dislike-btn">👎</span>').click(function () {
+                    handleReaction(data.msg_time, 'dislike');
+                });
+                var commentImg = $('<img src="commentImg.png" class="commentImg" alt="comment">').click(function () {
+                    toggleReplyMode(data.msg_time, data.name);
+                });
+                reactionButtons.append(likeCount).append(likeBtn).append(dislikeCount).append(dislikeBtn).append(commentImg);
+                msgBox.append(reactionButtons);
+                msgLine.append(msgBox);
+                $('#chatContent').append(msgLine);
+                $('#chatContent').append('<div class="replyContainer" id="reply-container-' + data.msg_time + '"></div>'); // Add reply container
+                updateScroll();
+            });
+
+            // 댓글 수신 처리
+            socket.on('newComment', function (data) {
+                var commentBox = $('<div class="msgBox comment" id="comment-' + data.msg_id + '-' + Date.now() + '">');
+                commentBox.append('<div>' + data.comment + '</div>');
+                if (data.name !== currentUser) {
+                    var commentTime = new Date().toLocaleString();
+                    commentBox.append('<div class="msgBox_from_and_time">(From. ' + data.name + ' 학생) ' + commentTime + '</div>');
+                }
+                var reactionButtons = $('<div class="reaction-buttons">');
+                var likeCount = $('<span class="like-count" id="like-count-' + data.msg_id + '-' + Date.now() + '">0</span>');
+                var likeBtn = $('<span class="like-btn">👍</span>').click(function () {
+                    handleReaction(commentBox.attr('id'), 'like');
+                });
+                var dislikeCount = $('<span class="dislike-count" id="dislike-count-' + data.msg_id + '-' + Date.now() + '">0</span>');
+                var dislikeBtn = $('<span class="dislike-btn">👎</span>').click(function () {
+                    handleReaction(commentBox.attr('id'), 'dislike');
+                });
+                reactionButtons.append(likeCount).append(likeBtn).append(dislikeCount).append(dislikeBtn);
+                commentBox.append(reactionButtons);
+
+                var replyContainer = $('#reply-container-' + data.msg_id);
+                if (data.name === currentUser) {
+                    commentBox.addClass('myComment rightAlign');
+                } else {
+                    commentBox.addClass('leftAlign');
+                }
+                replyContainer.append(commentBox); // Append to reply container
+                adjustReplyPosition(data.msg_id);
+                updateScroll();
+            });
+
+            // 좋아요 및 싫어요 버튼 클릭 처리
+            $(document).off('click', '.like-btn').on('click', '.like-btn', function () {
+                var msg_id = $(this).closest('.msgBox').attr('id');
+                var action = 'like';
+                socket.emit(action, { msg_id: msg_id, action: action });
+            });
+
+            $(document).off('click', '.dislike-btn').on('click', '.dislike-btn', function () {
+                var msg_id = $(this).closest('.msgBox').attr('id');
+                var action = 'dislike';
+                socket.emit(action, { msg_id: msg_id, action: action });
+            });
+
+            // 서버에서 좋아요 및 싫어요 업데이트 처리
+            socket.on('update', function (data) {
+                if (data.action === 'like') {
+                    $('#' + data.msg_id).find('.like-count').text(data.count);
+                } else if (data.action === 'dislike') {
+                    $('#' + data.msg_id).find('.dislike-count').text(data.count);
+                }
+            });
+
+            // 이미지 업로드 처리
+            $('.form_image').submit(function (e) {
+                e.preventDefault();
+                var fileInput = $('#fileInput');
+                var file = fileInput[0].files[0];
+                var reader = new FileReader();
+                reader.onload = function (event) {
+                    var imageSrc = event.target.result;
+                    resizeImage(imageSrc, 300, 300, function (resizedImage) {
+                        var base64Image = resizedImage.split(',')[1];
+                        var uniqueTime = new Date().getTime();
+                        socket.emit('base64', { base64: base64Image, msg_time: uniqueTime });
+
+                        var msgLine = $('<div class="msgLine">');
+                        var msgBox = $('<div class="msgBox_mychat" id="msg-' + uniqueTime + '">');
+                        var img = $('<img>');
+                        img.attr('src', 'data:img/png;base64,' + base64Image);
+                        msgBox.append(img);
+                        msgBox.css('display', 'inline-block');
+                        msgBox.css('max-width', '100%');
+                        msgBox.css('height', 'auto');
+                        msgBox.css('width', 'auto');
+
+                        var reactionButtons = $('<div class="reaction-buttons">');
+                        var likeCount = $('<span class="like-count" id="like-count-' + uniqueTime + '">0</span>');
+                        var likeBtn = $('<span class="like-btn">👍</span>').click(function () {
+                            socket.emit('like', { msg_id: uniqueTime });
+                        });
+                        var dislikeCount = $('<span class="dislike-count" id="dislike-count-' + uniqueTime + '">0</span>');
+                        var dislikeBtn = $('<span class="dislike-btn">👎</span>').click(function () {
+                            socket.emit('dislike', { msg_id: uniqueTime });
+                        });
+                        var commentImg = $('<img src="commentImg.png" class="commentImg" alt="comment">').click(function () {
+                            toggleReplyMode(uniqueTime, currentUser);
+                        });
+
+                        reactionButtons.append(likeCount).append(likeBtn).append(dislikeCount).append(dislikeBtn).append(commentImg);
+                        msgBox.append(reactionButtons);
+                        msgLine.css('text-align', 'right');
+                        msgLine.append(msgBox);
+                        $('#chatContent').append(msgLine);
+                        $('#chatContent').append('<div class="replyContainer" id="reply-container-' + uniqueTime + '"></div>'); // Add reply container
+                        $('#fileInput').val('');
+                        $('#imagePreview').hide();
+                        updateScroll();
+                    });
+                };
+                reader.readAsDataURL(file);
+            });
+
+            // 채팅 메시지 전송 처리
+            $('.form_text').submit(function (e) {
+                e.preventDefault();
+                var $myChat = $('#myChat');
+                var message = $myChat.val().trim();
+                if (message === '') return;
+
+                var uniqueTime = new Date().getTime();
+                if (currentReplyTo) {
+                    socket.emit('comment', { msg_id: currentReplyTo, comment: message });
+                    $('#myChat').attr('placeholder', '어떤 얘기여도 좋습니다!');
+                    $('#btn-primary').text('Send Text').removeClass('btn-success').addClass('btn-primary');
+                    currentReplyTo = null;
+                } else {
+                    socket.emit('chat', { msg: message, msg_time: uniqueTime });
+                    var msgLine = $('<div class="msgLine">');
+                    var msgBox = $('<div class="msgBox_mychat" id="msg-' + uniqueTime + '">');
+                    msgBox.append(message);
+                    msgBox.css('display', 'inline-block');
+                    var reactionButtons = $('<div class="reaction-buttons">');
+                    var likeCount = $('<span class="like-count" id="like-count-' + uniqueTime + '">0</span>');
+                    var likeBtn = $('<span class="like-btn">👍</span>').click(function () {
+                        handleReaction(uniqueTime, 'like');
+                    });
+                    var dislikeCount = $('<span class="dislike-count" id="dislike-count-' + uniqueTime + '">0</span>');
+                    var dislikeBtn = $('<span class="dislike-btn">👎</span>').click(function () {
+                        handleReaction(uniqueTime, 'dislike');
+                    });
+                    var commentImg = $('<img src="commentImg.png" class="commentImg" alt="comment">').click(function () {
+                        toggleReplyMode(uniqueTime, currentUser);
+                    });
+
+                    reactionButtons.append(likeCount).append(likeBtn).append(dislikeCount).append(dislikeBtn).append(commentImg);
+                    msgBox.append(reactionButtons);
+                    msgLine.append(msgBox);
+                    $('#chatContent').append(msgLine);
+                    $('#chatContent').append('<div class="replyContainer" id="reply-container-' + uniqueTime + '"></div>'); // Add reply container
+                }
+                $myChat.val('');
+                updateScroll();
+            });
+
+            //댓글 위치 
+           $('.form_text').submit(function (e) {
+            e.preventDefault();
+            var $myChat = $('#myChat');
+            var message = $myChat.val().trim();
+            if (message === '') return;
+
+            var uniqueTime = new Date().getTime();
+            if (currentReplyTo) {
+                // 댓글을 보내는 로직
+                socket.emit('comment', { msg_id: currentReplyTo, comment: message });
+                $('#myChat').attr('placeholder', '어떤 얘기여도 좋습니다!');
+                $('#btn-primary').text('Send Text').removeClass('btn-success').addClass('btn-primary');
+
+                // 댓글을 현재 댓글 모드가 활성화된 메시지 바로 아래에 추가
+                var msgLine = $('<div class="msgLine replyLine">'); // 스타일링을 위해 replyLine 클래스 추가 가능
+                var msgBox = $('<div class="msgBox_mychat" id="msg-' + uniqueTime + '">');
+                msgBox.append(message);
+                msgBox.css('display', 'inline-block');
+                msgLine.append(msgBox);
+                $('#msg-' + currentReplyTo).after(msgLine); // 특정 메시지 바로 아래에 댓글 삽입
+
+                currentReplyTo = null; // 댓글 모드 비활성화
+            } else {
+                // 일반 채팅 메시지 보내는 로직
+                socket.emit('chat', { msg: message, msg_time: uniqueTime });
+                var msgLine = $('<div class="msgLine">');
+                var msgBox = $('<div class="msgBox_mychat" id="msg-' + uniqueTime + '">');
+                msgBox.append(message);
+                msgBox.css('display', 'inline-block');
+                msgLine.append(msgBox);
+                $('#chatContent').append(msgLine);
+            }
+            $myChat.val('');
+            updateScroll();
+        });
+
+            // 이미지 미리보기 처리
+            $('#fileInput').change(function () {
+                var file = this.files[0];
+                var reader = new FileReader();
+                reader.onload = function (e) {
+                    $('#imagePreview').attr('src', e.target.result).show();
+                };
+                reader.readAsDataURL(file);
+            });
+
+            function makeRandomName() {
+                var name = '';
+                var possible = 'abcdefghijklmnopqrstuvwxyz';
+                for (var i = 0; i < 3; i++) {
+                    name += possible.charAt(Math.floor(Math.random() * possible.length));
+                }
+                return name;
+            }
+
+            function base64FileHeaderMapper(fileBase64) {
+                let fileHeader = new Map();
+                fileHeader.set('/9j', 'jpg');
+                fileHeader.set('iVB', 'png');
+                fileHeader.set('Qk0', 'bmp');
+                fileHeader.set('SUk', 'tiff');
+                fileHeader.set('JVB', 'pdf');
+                fileHeader.set('UEs', 'ofd');
+
+                let res = '';
+                fileHeader.forEach((v, k) => {
+                    if (k == fileBase64.substr(0, 3)) res = v;
+                });
+
+                if (res == '') res = 'unknown file';
+
+                return res;
+            }
+
+            function updateScroll() {
+                var element = document.getElementById('chatContent');
+                element.scrollTop = element.scrollHeight;
+            }
+
+            function resizeImage(base64Str, maxWidth, maxHeight, callback) {
+                var img = new Image();
+                img.src = base64Str;
+                img.onload = function () {
+                    var canvas = document.createElement('canvas');
+                    var ctx = canvas.getContext('2d');
+                    var ratio = Math.min(maxWidth / img.width, maxHeight / img.height);
+                    canvas.width = img.width * ratio;
+                    canvas.height = img.height * ratio;
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    callback(canvas.toDataURL());
+                };
+            }
+
+            // 좋아요 및 싫어요 처리 함수
+            function handleReaction(msg_id, action) {
+                socket.emit(action, { msg_id: msg_id, action: action });
+            }
+
+            // 댓글 모드 토글
+            function toggleReplyMode(msg_id, name) {
+                if (currentReplyTo === msg_id) {
+                    currentReplyTo = null;
+                    $('#myChat').attr('placeholder', '어떤 얘기여도 좋습니다!');
+                    $('#btn-primary').text('Send Text').removeClass('btn-success').addClass('btn-primary');
+                } else {
+                    currentReplyTo = msg_id;
+                    $('#myChat').attr('placeholder', '답글을 입력하세요!');
+                    $('#btn-primary').text('Send Reply').removeClass('btn-primary').addClass('btn-success');
+                }
+                $('#myChat').data('reply-to-name', name);
+            }
+
+            // 답글 위치 조정 함수
+            function adjustReplyPosition(msg_id) {
+                var replyContainer = $('#reply-container-' + msg_id);
+                var originalCommentName = $('#msg-' + msg_id).find('.msgBox_from_and_time').text().split(' ')[1];
+                
+                replyContainer.find('.comment').each(function () {
+                    if ($(this).hasClass('myComment')) {
+                        $(this).addClass('rightAlign').removeClass('leftAlign');
+                    } else {
+                        $(this).addClass('leftAlign').removeClass('rightAlign');
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>회원가입</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+</head>
+<body class="p-4" style="padding-top: 180px !important;">
+    <div class="container" style="max-width:480px;">
+        <h3 class="mb-3">회원가입</h3>
+        <form id="signupForm" method="post" action="/signup">
+            <div class="form-group">
+                <label>이메일</label>
+                <input class="form-control" type="email" name="email" required />
+            </div>
+            <div class="form-group">
+                <label>비밀번호</label>
+                <input class="form-control" type="password" name="password" required />
+            </div>
+            <div class="form-group">
+                <label>이름</label>
+                <input class="form-control" type="text" name="name" required />
+            </div>
+            <div class="form-group">
+                <label>학교</label>
+                <input class="form-control" type="text" name="school" required />
+            </div>
+            <div class="form-group">
+                <label>사번(학번)</label>
+                <div style="display: flex; align-items: center;">
+                    <span style="margin-right: 5px;">20</span>
+                    <input class="form-control" 
+                           style="width: auto; flex: 1;" 
+                           type="text" 
+                           id="studentNumber" 
+                           name="studentNumber" 
+                           placeholder="나머지 학번을 입력하세요" 
+                           required />
+                  </div>
+                  
+            </div>
+            <button class="btn btn-primary btn-block" type="submit">가입하기</button>
+            <a class="btn btn-link btn-block" href="/login">로그인</a>
+        </form>
+        
+        <!-- DMKD Logo -->
+        <div class="text-center mt-5">
+            <a href="https://lab.researchwho.com/DSWU-DMKD/" target="_blank" 
+               onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'"
+               style="transition: opacity 0.3s;">
+                <img src="/DMKD_logo.jpg" alt="DMKD Logo" style="max-width: 200px; height: auto; border-radius: 5px;" />
+            </a>
+        </div>
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            // 학번 입력 필드에서 숫자만 입력 가능하도록 제한
+            $('#studentNumber').on('input', function() {
+                this.value = this.value.replace(/[^0-9]/g, '');
+            });
+
+            // 폼 제출 시 학번 검증
+            $('#signupForm').on('submit', function(e) {
+                e.preventDefault();
+                
+                const studentNumber = $('#studentNumber').val();
+                const fullStudentNumber = '20' + studentNumber;
+                
+                if (fullStudentNumber.length === 7) {
+                    // 7자리인 경우 - 회원가입 승인
+                    alert('회원가입이 완료되었습니다.');
+                    this.submit();
+                } else if (fullStudentNumber.length === 8) {
+                    // 8자리인 경우 - 회원가입 거절
+                    alert('회원가입이 거절되었습니다.');
+                    window.location.href = '/';
+                } else {
+                    // 그 외의 경우 - 학번 오류
+                    alert('학번이 잘못 입력되었습니다.');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
+

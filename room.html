@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title><h3 class="mb-0"><img src="/chat_title.jpg" alt="Logo" style="max-width: 150px; height: auto; border-radius: 5px; transition: opacity 0.3s;" 
+        onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'" /></h3></title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div class="fullscreen">
+        <div class="top_screen">
+            <div id="youtubeContainer" class="youtube-container" style="width: 100%; margin-bottom: 10px; display: none;">
+                <div id="youtubeHeader" style="background-color: #f8f9fa; padding: 8px 12px; border: 1px solid #dee2e6; border-bottom: none; border-radius: 5px 5px 0 0; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: bold; color: #495057;">📺 유튜브 영상</span>
+                    <span id="youtubeToggle" style="font-size: 18px; color: #6c757d;">▼</span>
+                </div>
+                <div id="youtubeContent" style="border: 1px solid #dee2e6; border-top: none; border-radius: 0 0 5px 5px; overflow: hidden;">
+                    <iframe id="youtubePlayer" width="100%" height="200px" 
+                            src="" 
+                            frameborder="0" allowfullscreen
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                            referrerpolicy="strict-origin-when-cross-origin"
+                            sandbox="allow-same-origin allow-scripts allow-popups allow-forms">
+                    </iframe>
+                </div>
+            </div>
+            <div class="notification">
+                <strong id="roomName">[방제목] 수업에 오신 것을 환영합니다!</strong>
+                <span id="participantCount" style="margin-left: 20px; font-size: 14px; color: #666;">참여자: 0명</span>
+                <div id="timerDisplay" style="margin-top: 10px; font-size: 16px; font-weight: bold; color: #007bff; display: none;">
+                    <span id="timerText">타이머 정보</span>
+                </div>
+            </div>
+        </div>
+        <div class="main_content">
+            <div class="left_screen">
+                <div id="chatBox">
+                    <div id="chatContent"></div>
+                </div>
+                <form class="form_text">
+                    <!-- <input type="text" id="myChat" placeholder="메시지를 입력하세요" class="form-control" /> -->
+                    <textarea id="myChat" placeholder="메시지를 입력하세요" class="form-control" rows="2" style="resize: none; height: 60px;"></textarea>
+
+                    <button type="submit" id="btn-primary" class="btn btn-primary">Send Text</button>
+                </form>
+                
+                <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox" id="isQuestion" name="isQuestion">
+                    <label class="form-check-label" for="isQuestion" style="color: black;">
+                        질문
+                    </label>
+                </div>
+                <form class="form_image">
+                    <div class="input-group">
+                        <input type="file" id="fileInput" class="form-control" />
+                        <div class="input-group-append">
+                            <button type="submit" id="btn-primary-image" class="btn btn-primary">Send Image</button>
+                        </div>
+                    </div>
+                    <div id="imagePreviewContainer">
+                        <img id="imagePreview" style="display: none; max-width: 100px; max-height: 100px; margin-top: 10px;" />
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        $(function(){
+            const socket = io();
+            const url = new URL(location.href);
+            const roomId = location.pathname.split('/').pop();
+            const pw = url.searchParams.get('pw') || '';
+            let myAlias = '';
+            let currentReplyTo = null;
+
+
+            function loadDefaultVideo() {
+                $('#youtubeContainer').show();
+                const defaultVideoId = 'BMYkBErEazM';
+                const defaultEmbedUrl = 'https://www.youtube.com/embed/' + defaultVideoId + '?autoplay=0';
+                
+                console.log('Loading default YouTube video:', defaultEmbedUrl);
+                
+                // Force reload by clearing src first, then setting new src
+                $('#youtubePlayer').attr('src', '');
+                setTimeout(function() {
+                    $('#youtubePlayer').attr('src', defaultEmbedUrl);
+                }, 100);
+            }
+
+            function updateScroll(){
+                var element = document.getElementById('chatContent');
+                element.scrollTop = element.scrollHeight;
+            }
+
+            function loadChatHistory(roomId) {
+                $.get('/api/rooms/' + roomId + '/history')
+                    .done(function(history) {
+                        console.log('Loading chat history:', history.length, 'messages');
+                        history.forEach(function(entry) {
+                            renderHistoryMessage(entry);
+                        });
+                        updateScroll();
+                    })
+                    .fail(function() {
+                        console.log('Failed to load chat history');
+                    });
+            }
+
+            function renderHistoryMessage(entry) {
+                var msgTime = new Date(entry.time);
+                var formattedTime = msgTime.toLocaleTimeString("ko-KR", {
+                    hour: "numeric",
+                    minute: "2-digit",
+                    hour12: true
+                });
+
+                if (entry.type === 'chat') {
+                    var msgLine = $('<div class="msgLine">');
+                    var msgBox = $('<div class="msgBox" id="msg-' + entry.time + '">');
+                    if (entry.isQuestion) {
+                        msgBox.css({
+                            'background-color': '#d4edda', // 파스텔 톤 초록색
+                            'border': '1px solid #c3e6cb', // 파스텔 톤 초록색 테두리
+                            'color': 'black' // 글자 색 검은색
+                        });
+                    }
+                    msgBox.append('<div>' + entry.msg + '</div>');
+                    msgBox.append('<div class="msgBox_from_and_time" style="color: ' + (entry.isQuestion ? 'black' : '') + '">(From. ' + entry.from + ' 학생) ' + formattedTime + '</div>');
+                    msgLine.append(msgBox);
+                    $('#chatContent').append(msgLine);
+                } else if (entry.type === 'image') {
+                    var msgLine = $('<div class="msgLine">');
+                    var msgBox = $('<div class="msgBox" id="msg-' + entry.time + '">');
+                    var img = $('<img>').attr('src', entry.base64).css({
+                        'max-width': '300px',
+                        'max-height': '300px',
+                        'display': 'block',
+                        'margin': '10px 0'
+                    });
+                    msgBox.append(img);
+                    msgBox.append('<div class="msgBox_from_and_time">(From. ' + entry.from + ' 학생) ' + formattedTime + '</div>');
+                    msgLine.append(msgBox);
+                    $('#chatContent').append(msgLine);
+                } else if (entry.type === 'comment') {
+                    var uniqueTime = entry.time;
+                    var commentBox = $('<div class="msgBox comment" id="comment-' + entry.msgId + '-' + uniqueTime + '">');
+                    commentBox.attr('data-original-id', 'msg-' + entry.msgId);
+                    
+                    var replyIndicator = $('<div class="reply-indicator" style="font-size: 12px; color: black; margin-bottom: 5px;">↳ 답글</div>');
+                    commentBox.append(replyIndicator);
+                    commentBox.append('<div style="color: black;">' + entry.comment + '</div>');
+                    commentBox.append('<div class="msgBox_from_and_time" style="color: black;">(From. ' + entry.from + ' 학생) ' + formattedTime + '</div>');
+                    
+                    // Add click to scroll to original message
+                    commentBox.css('cursor', 'pointer');
+                    commentBox.on('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        var originalId = $(this).attr('data-original-id');
+                        var originalMsg = $('#' + originalId);
+                        if (originalMsg.length) {
+                            originalMsg[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            // Check if the original message is mine
+                            if (originalMsg.hasClass('msgBox_mychat')) {
+                                // My message - use black highlight
+                                originalMsg.css('background-color', '#333333');
+                                originalMsg.css('border', '2px solid #000000');
+                                originalMsg.css('color', 'white');
+                            } else {
+                                // Other's message - use yellow highlight
+                                originalMsg.css('background-color', '#ffffcc');
+                                originalMsg.css('border', '2px solid #ffcc00');
+                            }
+                            setTimeout(function() {
+                                originalMsg.css('background-color', '');
+                                originalMsg.css('border', '');
+                                originalMsg.css('color', '');
+                            }, 3000);
+                        }
+                    });
+                    
+                    var msgLine = $('<div class="msgLine">');
+                    msgLine.append(commentBox);
+                    $('#chatContent').append(msgLine);
+                }
+            }
+
+            // Get user email from session
+            $.get('/api/me').done(function(me) {
+                const userEmail = me && me.loggedIn ? me.email : null;
+                
+                socket.emit('joinRoom', { roomId, password: pw, userEmail }, function(resp){
+                    if(!resp || !resp.ok){
+                        let errorMessage = '입장 실패: ';
+                        switch(resp && resp.error) {
+                            case 'ROOM_NOT_STARTED':
+                                errorMessage = '방이 아직 시작되지 않았습니다.';
+                                break;
+                            case 'ROOM_EXPIRED':
+                                errorMessage = '방이 종료되었습니다.';
+                                break;
+                            case 'BAD_PASSWORD':
+                                errorMessage = '비밀번호가 틀렸습니다.';
+                                break;
+                            case 'NOT_FOUND':
+                                errorMessage = '존재하지 않는 방입니다.';
+                                break;
+                            default:
+                                errorMessage += (resp && resp.error) || '알 수 없는 오류';
+                        }
+                        alert(errorMessage);
+                        location.href = '/rooms';
+                        return;
+                    }
+                    myAlias = resp.alias;
+                    $('#roomName').text('[' + resp.roomName + '] 수업에 오신 것을 환영합니다!');
+                    
+                    // Show YouTube only if enabled
+                    if (resp.youtubeUrl) {
+                        console.log('Loading default YouTube video');
+                        loadDefaultVideo();
+                    } else {
+                        // No YouTube enabled - hide YouTube container completely
+                        $('#youtubeContainer').hide();
+                    }
+                    
+                    console.log('Successfully joined room:', roomId, 'as:', myAlias, 'isOwner:', resp.isOwner);
+                    
+                    // Initialize timer if available and user is logged in
+                    if (resp.startTime && resp.endTime && userEmail) {
+                        initializeTimer(resp.startTime, resp.endTime);
+                    }
+                    
+                    // Load recent chat history
+                    loadChatHistory(roomId);
+                });
+            });
+
+            socket.on('login', function (data) {
+                var msgLine = $('<div class="msgLine">');
+                var msgBox = $('<div class="msgBox_login">');
+                msgBox.append('<strong>익명</strong>님이 채팅방에 참여하였습니다 ' + data.enter_time);
+                msgBox.css('display', 'inline-block');
+                msgLine.append(msgBox);
+                $('#chatContent').append(msgLine);
+                updateScroll();
+            });
+
+            // Handle participant count updates
+            socket.on('participantCount', function (data) {
+                $('#participantCount').text('참여자: ' + data.count + '명');
+            });
+
+            // Handle room expiration
+            socket.on('roomExpired', function (data) {
+                alert(data.message);
+                location.href = '/rooms';
+            });
+
+
+            // Handle Enter key behavior
+            $('#myChat').keydown(function(e) {
+                if (e.key === 'Enter') {
+                    if (e.shiftKey) {
+                        // Shift+Enter: Allow line break (default behavior)
+                        return true;
+                    } else {
+                        // Enter only: Submit form
+                        e.preventDefault();
+                        $('.form_text').submit();
+                        return false;
+                    }
+                }
+            });
+
+            // Handle Question checkbox toggle
+            $('#isQuestion').change(function() {
+                if ($(this).is(':checked')) {
+                    $('#btn-primary').removeClass('btn-primary').addClass('btn-danger');
+                    // 질문 체크박스 체크시 채팅창으로 커서 이동
+                    $('#myChat').focus();
+                } else {
+                    $('#btn-primary').removeClass('btn-danger').addClass('btn-primary');
+                }
+            });
+
+            // Handle YouTube container collapse/expand
+            $('#youtubeHeader').click(function() {
+                const content = $('#youtubeContent');
+                const toggle = $('#youtubeToggle');
+                
+                if (content.is(':visible')) {
+                    content.slideUp(300);
+                    toggle.text('▶');
+                } else {
+                    content.slideDown(300);
+                    toggle.text('▼');
+                }
+            });
+
+            $('.form_text').submit(function(e){
+                e.preventDefault();
+                var $myChat = $('#myChat');
+                var message = $myChat.val().trim();
+                if (!message) return;
+                var uniqueTime = Date.now();
+                if (currentReplyTo) {
+                    socket.emit('comment', { roomId, msg_id: currentReplyTo, comment: message });
+                    // 내 댓글은 바로 표시
+                    var commentBox = $('<div class="msgBox comment myComment rightAlign" id="comment-' + currentReplyTo + '-' + uniqueTime + '">');
+                    commentBox.attr('data-original-id',currentReplyTo);  // 원본 메시지 ID 저장
+                    var formattedTime = new Date().toLocaleTimeString("ko-KR", {
+                        hour: "numeric",
+                        minute: "2-digit",
+                        hour12: true
+                    });
+                    
+                    // Add reply indicator
+                    var replyIndicator = $('<div class="reply-indicator" style="font-size: 12px; color: white; margin-bottom: 5px;">↳ 답글</div>');
+                    commentBox.append(replyIndicator);
+                    commentBox.append('<div style="color: white;">' + message + '</div>');
+                    commentBox.append('<div class="msgBox_from_and_time">(From. ' + myAlias + ' 학생) ' + formattedTime + '</div>');
+                    
+                    // Add reaction buttons for my comment
+                    var reactionButtons = $('<div class="reaction-buttons">');
+                    var likeCount = $('<span class="like-count" id="like-count-comment-' + currentReplyTo + '-' + uniqueTime + '">0</span>');
+                    var dislikeCount = $('<span class="dislike-count" id="dislike-count-comment-' + currentReplyTo + '-' + uniqueTime + '">0</span>');
+                    var commentBtn = $('<span class="commentBtn" style="cursor:pointer; margin-left:6px;">💬</span>').click(function(){
+                        toggleReplyMode('comment-' + currentReplyTo + '-' + uniqueTime, myAlias);
+                    });
+                    reactionButtons
+                        .append('👍 ').append(likeCount)
+                        .append('  ')
+                        .append('👎 ').append(dislikeCount)
+                        .append('  ').append(commentBtn);
+                    commentBox.append(reactionButtons);
+                    
+                    // Add click to scroll to original message
+                    commentBox.css('cursor', 'pointer');
+                    commentBox.on('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        var originalId = $(this).attr('data-original-id');  // 원본 ID 불러오기
+                        console.log('My reply clicked, looking for original message:', originalId);
+                        console.log('Looking for selector: #' + originalId);
+                        var originalMsg = $('#' + originalId);
+                        console.log('Found original message:', originalMsg.length);
+                        // Debug: List all message elements
+                        console.log('All message elements:', $('[id^="msg-"]').map(function() { return this.id; }).get());
+                        if (originalMsg.length) {
+                            originalMsg[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            // Check if the original message is mine
+                            if (originalMsg.hasClass('msgBox_mychat')) {
+                                // My message - use black highlight
+                                originalMsg.css('background-color', '#333333');
+                                originalMsg.css('border', '2px solid #000000');
+                                originalMsg.css('color', 'white');
+                            } else {
+                                // Other's message - use yellow highlight
+                                originalMsg.css('background-color', '#ffffcc');
+                                originalMsg.css('border', '2px solid #ffcc00');
+                            }
+                            setTimeout(function() {
+                                originalMsg.css('background-color', '');
+                                originalMsg.css('border', '');
+                                originalMsg.css('color', '');
+                            }, 3000);
+                        } else {
+                            console.log('Original message not found with ID:', originalId);
+                        }
+                    });
+                    
+                    // Add to main chat area
+                    var msgLine = $('<div class="msgLine">');
+                    msgLine.append(commentBox);
+                    $('#chatContent').append(msgLine);
+                    
+                    currentReplyTo = null;
+                    $('#btn-primary').text('Send Text').removeClass('btn-success').addClass('btn-primary');
+                    $('#myChat').attr('placeholder', '메시지를 입력하세요');
+                } else {
+                    var isQuestion = $('#isQuestion').is(':checked');
+                    socket.emit('chat', { roomId, msg: message, msg_time: uniqueTime, isQuestion: isQuestion });
+                    var msgTime = new Date(uniqueTime);
+                    var formattedTime = msgTime.toLocaleTimeString("ko-KR", {
+                        hour: "numeric",
+                        minute: "2-digit",
+                        hour12: true
+                    });
+                    var msgLine = $('<div class="msgLine">');
+                    var msgBox = $('<div class="msgBox_mychat" id="msg-' + uniqueTime + '">');
+                    if (isQuestion) {
+                        msgBox.css({
+                            'background-color': '#d4edda', // 파스텔 톤 초록색
+                            'border': '1px solid #c3e6cb', // 파스텔 톤 초록색 테두리
+                            'color': 'black' // 글자 색 검은색
+                        });
+                    }
+                    msgBox.append('<div>' + message + '</div>');
+                    msgBox.append('<div class="msgBox_from_and_time" style="color: ' + (isQuestion ? 'black' : 'white') + '; font-size: 12px; margin-top: 5px;">' + formattedTime + '</div>');
+                    msgBox.css('display', 'inline-block');
+                    // 내 메시지: 카운트는 보이되 버튼은 숨김, 답글 버튼은 표시
+                    var reactionButtons = $('<div class="reaction-buttons">');
+                    var likeCountSelf = $('<span class="like-count" id="like-count-' + uniqueTime + '">0</span>');
+                    var dislikeCountSelf = $('<span class="dislike-count" id="dislike-count-' + uniqueTime + '">0</span>');
+                    var commentBtnSelf = $('<span class="commentBtn" style="cursor:pointer; margin-left:6px;">💬</span>').click(function(){
+                        toggleReplyMode('msg-' + uniqueTime, myAlias);
+                    });
+                    reactionButtons
+                        .append('👍 ').append(likeCountSelf)
+                        .append('  ')
+                        .append('👎 ').append(dislikeCountSelf)
+                        .append('  ').append(commentBtnSelf);
+                    msgBox.append(reactionButtons);
+                    msgLine.append(msgBox);
+                    $('#chatContent').append(msgLine);
+                    $('#chatContent').append('<div class="replyContainer" id="reply-container-msg-' + uniqueTime + '"></div>');
+                }
+                $myChat.val('');
+                $('#isQuestion').prop('checked', false);
+                $('#btn-primary').removeClass('btn-danger').addClass('btn-primary'); // 버튼 색상 초기화
+                $myChat.focus(); // 커서를 메시지 입력창으로 이동
+                updateScroll();
+            });
+
+            socket.on('chat', function (data) {
+                if(!(data && data.msg && data.msg_time)) return;
+                var msgTime = new Date(data.msg_time);
+                var formattedTime = msgTime.toLocaleTimeString("ko-KR", {
+                    hour: "numeric",
+                    minute: "2-digit",
+                    hour12: true
+                });
+                var msgLine = $('<div class="msgLine">');
+                var msgBox = $('<div class="msgBox" id="msg-' + data.msg_time + '">');
+                if (data.isQuestion) {
+                    msgBox.css({
+                        'background-color': '#d4edda', // 파스텔 톤 초록색
+                        'border': '1px solid #c3e6cb', // 파스텔 톤 초록색 테두리
+                        'color': 'black' // 글자 색 검은색
+                    });
+                }
+                msgBox.append(data.msg + '<div class="msgBox_from_and_time" style="color: ' + (data.isQuestion ? 'black' : '') + '">(From. ' + data.name + ' 학생) ' + formattedTime + '</div>');
+                msgBox.css('display', 'inline-block');
+                var reactionButtons = $('<div class="reaction-buttons">');
+                var likeCount = $('<span class="like-count" id="like-count-' + data.msg_time + '">0</span>');
+                var likeBtn = $('<span class="like-btn">👍</span>').click(function () {
+                    handleReaction('msg-' + data.msg_time, 'like');
+                });
+                var dislikeCount = $('<span class="dislike-count" id="dislike-count-' + data.msg_time + '">0</span>');
+                var dislikeBtn = $('<span class="dislike-btn">👎</span>').click(function () {
+                    handleReaction('msg-' + data.msg_time, 'dislike');
+                });
+                var commentBtn = $('<span class="commentBtn" style="cursor:pointer; margin-left:6px;">💬</span>').click(function(){
+                    toggleReplyMode('msg-' + data.msg_time, data.name);
+                });
+                reactionButtons.append(likeCount).append(likeBtn).append(dislikeCount).append(dislikeBtn).append(commentBtn);
+                msgBox.append(reactionButtons);
+                msgLine.append(msgBox);
+                $('#chatContent').append(msgLine);
+                $('#chatContent').append('<div class="replyContainer" id="reply-container-msg-' + data.msg_time + '"></div>');
+                updateScroll();
+            });
+
+            socket.on('newComment', function (data) {
+                var uniqueTime = Date.now();
+                var commentBox = $('<div class="msgBox comment" id="comment-' + data.msg_id + '-' + uniqueTime + '">');
+                commentBox.attr('data-original-id', data.msg_id);  // 원본 메시지 ID 저장
+                var formattedTime = new Date().toLocaleTimeString("ko-KR", {
+                    hour: "numeric",
+                    minute: "2-digit",
+                    hour12: true
+                });
+                
+                // Add reply indicator
+                var replyIndicator = $('<div class="reply-indicator" style="font-size: 12px; color: black; margin-bottom: 5px;">↳ 답글</div>');
+                commentBox.append(replyIndicator);
+                commentBox.append('<div style="color: black;">' + data.comment + '</div>');
+                commentBox.append('<div class="msgBox_from_and_time" style="color: black;">(From. ' + data.name + ' 학생) ' + formattedTime + '</div>');
+                
+                // Add reaction buttons for comments
+                var reactionButtons = $('<div class="reaction-buttons">');
+                var likeCount = $('<span class="like-count" id="like-count-comment-' + data.msg_id + '-' + uniqueTime + '">0</span>');
+                var likeBtn = $('<span class="like-btn">👍</span>').click(function () {
+                    handleReaction('comment-' + data.msg_id + '-' + uniqueTime, 'like');
+                });
+                var dislikeCount = $('<span class="dislike-count" id="dislike-count-comment-' + data.msg_id + '-' + uniqueTime + '">0</span>');
+                var dislikeBtn = $('<span class="dislike-btn">👎</span>').click(function () {
+                    handleReaction('comment-' + data.msg_id + '-' + uniqueTime, 'dislike');
+                });
+                var commentBtn = $('<span class="commentBtn" style="cursor:pointer; margin-left:6px;">💬</span>').click(function(){
+                    toggleReplyMode('comment-' + data.msg_id + '-' + uniqueTime, data.name);
+                });
+                reactionButtons.append(likeCount).append(likeBtn).append(dislikeCount).append(dislikeBtn).append(commentBtn);
+                commentBox.append(reactionButtons);
+                
+                // Add click to scroll to original message for all replies
+                commentBox.css('cursor', 'pointer');
+                commentBox.on('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    var originalId = $(this).attr('data-original-id');  // 원본 ID 불러오기
+                    console.log('Reply clicked, looking for original message:', originalId);
+                    console.log('Looking for selector: #msg-' + originalId);
+                    var originalMsg = $('#' + originalId);
+                    console.log('Found original message:', originalMsg.length);
+                    // Debug: List all message elements
+                    console.log('All message elements:', $('[id^="msg-"]').map(function() { return this.id; }).get());
+                    if (originalMsg.length) {
+                        originalMsg[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        // Check if the original message is mine
+                        if (originalMsg.hasClass('msgBox_mychat')) {
+                            // My message - use black highlight
+                            originalMsg.css('background-color', '#333333');
+                            originalMsg.css('border', '2px solid #000000');
+                            originalMsg.css('color', 'white');
+                        } else {
+                            // Other's message - use yellow highlight
+                            originalMsg.css('background-color', '#ffffcc');
+                            originalMsg.css('border', '2px solid #ffcc00');
+                        }
+                        setTimeout(function() {
+                            originalMsg.css('background-color', '');
+                            originalMsg.css('border', '');
+                            originalMsg.css('color', '');
+                        }, 3000);
+                    } else {
+                        console.log('Original message not found with ID:', originalId);
+                    }
+                });
+                
+                if (data.name === myAlias) {
+                    commentBox.addClass('myComment rightAlign');
+                } else {
+                    commentBox.addClass('leftAlign');
+                }
+                
+                // Add to main chat area instead of reply container
+                var msgLine = $('<div class="msgLine">');
+                msgLine.append(commentBox);
+                $('#chatContent').append(msgLine);
+                updateScroll();
+            });
+
+            // Handle received images from other users
+            socket.on('base64', function (data) {
+                console.log('Received base64 image:', data);
+                if(!(data && data.msg && data.msg_time)) {
+                    console.log('Invalid base64 data:', data);
+                    return;
+                }
+                var msgTime = new Date(data.msg_time);
+                var formattedTime = msgTime.toLocaleTimeString("ko-KR", {
+                    hour: "numeric",
+                    minute: "2-digit",
+                    hour12: true
+                });
+                var msgLine = $('<div class="msgLine">');
+                var msgBox = $('<div class="msgBox" id="msg-' + data.msg_time + '">');
+                msgBox.append('<div class="msgBox_from_and_time">(From. ' + data.name + ' 학생) ' + formattedTime + '</div>');
+                var img = $('<img>');
+                var img_type = base64FileHeaderMapper(data.msg);
+                img.attr('src', 'data:img/' + img_type + ';base64,' + data.msg);
+                msgBox.append(img);
+                msgBox.css('display', 'inline-block');
+                var reactionButtons = $('<div class="reaction-buttons">');
+                var likeCount = $('<span class="like-count" id="like-count-' + data.msg_time + '">0</span>');
+                var likeBtn = $('<span class="like-btn">👍</span>').click(function () {
+                    handleReaction('msg-' + data.msg_time, 'like');
+                });
+                var dislikeCount = $('<span class="dislike-count" id="dislike-count-' + data.msg_time + '">0</span>');
+                var dislikeBtn = $('<span class="dislike-btn">👎</span>').click(function () {
+                    handleReaction('msg-' + data.msg_time, 'dislike');
+                });
+                var commentBtn = $('<span class="commentBtn" style="cursor:pointer; margin-left:6px;">💬</span>').click(function(){
+                    toggleReplyMode('msg-' + data.msg_time, data.name);
+                });
+                reactionButtons.append(likeCount).append(likeBtn).append(dislikeCount).append(dislikeBtn).append(commentBtn);
+                msgBox.append(reactionButtons);
+                msgLine.append(msgBox);
+                $('#chatContent').append(msgLine);
+                $('#chatContent').append('<div class="replyContainer" id="reply-container-msg-' + data.msg_time + '"></div>');
+                updateScroll();
+            });
+
+            $('.form_image').submit(function (e) {
+                e.preventDefault();
+                var fileInput = $('#fileInput');
+                var file = fileInput[0].files[0];
+                var reader = new FileReader();
+                reader.onload = function (event) {
+                    var imageSrc = event.target.result;
+                    resizeImage(imageSrc, 300, 300, function (resizedImage) {
+                        var base64Image = resizedImage.split(',')[1];
+                        var uniqueTime = Date.now();
+                        console.log('Sending base64 image to room:', roomId);
+                        socket.emit('base64', { roomId, base64: base64Image, msg_time: uniqueTime });
+                        var msgLine = $('<div class="msgLine">');
+                        var msgBox = $('<div class="msgBox_mychat" id="msg-' + uniqueTime + '">');
+                        var img = $('<img>');
+                        img.attr('src', 'data:img/png;base64,' + base64Image);
+                        msgBox.append(img);
+                        msgBox.css('display', 'inline-block');
+                        msgBox.css('max-width', '100%');
+                        msgBox.css('height', 'auto');
+                        msgBox.css('width', 'auto');
+                        var reactionButtons = $('<div class="reaction-buttons">');
+                        var likeCountSelfImg = $('<span class="like-count" id="like-count-' + uniqueTime + '">0</span>');
+                        var dislikeCountSelfImg = $('<span class="dislike-count" id="dislike-count-' + uniqueTime + '">0</span>');
+                        var commentBtnSelfImg = $('<span class="commentBtn" style="cursor:pointer; margin-left:6px;">💬</span>').click(function(){
+                            toggleReplyMode('msg-' + uniqueTime, myAlias);
+                        });
+                        reactionButtons
+                            .append('👍 ').append(likeCountSelfImg)
+                            .append('  ')
+                            .append('👎 ').append(dislikeCountSelfImg)
+                            .append('  ').append(commentBtnSelfImg);
+                        msgBox.append(reactionButtons);
+                        msgLine.css('text-align', 'right');
+                        msgLine.append(msgBox);
+                        $('#chatContent').append(msgLine);
+                        $('#chatContent').append('<div class="replyContainer" id="reply-container-msg-' + uniqueTime + '"></div>');
+                        $('#fileInput').val('');
+                        $('#imagePreview').hide();
+                        updateScroll();
+                    });
+                };
+                reader.readAsDataURL(file);
+            });
+
+            // 서버에서 리액션 카운트 업데이트
+            socket.on('update', function (data) {
+                if (data.action === 'like') {
+                    $('#' + data.msg_id).find('.like-count').text(data.count);
+                } else if (data.action === 'dislike') {
+                    $('#' + data.msg_id).find('.dislike-count').text(data.count);
+                }
+            });
+
+            function handleReaction(msg_id, action) {
+                socket.emit(action, { roomId, msg_id: msg_id, action: action });
+            }
+
+            function toggleReplyMode(msg_id, name) {
+                if (currentReplyTo === msg_id) {
+                    currentReplyTo = null;
+                    $('#myChat').attr('placeholder', '메시지를 입력하세요');
+                    $('#btn-primary').text('Send Text').removeClass('btn-success').addClass('btn-primary');
+                } else {
+                    currentReplyTo = msg_id;
+                    $('#myChat').attr('placeholder', '답글을 입력하세요!');
+                    $('#btn-primary').text('Send Reply').removeClass('btn-primary').addClass('btn-success');
+                    // Focus on input field
+                    $('#myChat').focus();
+                }
+            }
+
+            function resizeImage(base64Str, maxWidth, maxHeight, callback) {
+                var img = new Image();
+                img.src = base64Str;
+                img.onload = function () {
+                    var canvas = document.createElement('canvas');
+                    var ctx = canvas.getContext('2d');
+                    var ratio = Math.min(maxWidth / img.width, maxHeight / img.height);
+                    canvas.width = img.width * ratio;
+                    canvas.height = img.height * ratio;
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    callback(canvas.toDataURL());
+                };
+            }
+
+            function base64FileHeaderMapper(fileBase64) {
+                let fileHeader = new Map();
+                fileHeader.set('/9j', 'jpg');
+                fileHeader.set('iVB', 'png');
+                fileHeader.set('Qk0', 'bmp');
+                fileHeader.set('SUk', 'tiff');
+                fileHeader.set('JVB', 'pdf');
+                fileHeader.set('UEs', 'ofd');
+
+                let res = '';
+                fileHeader.forEach((v, k) => {
+                    if (k == fileBase64.substr(0, 3)) res = v;
+                });
+
+                if (res == '') res = 'unknown file';
+
+                return res;
+            }
+
+            // Timer functionality
+            let timerInterval = null;
+            
+            function initializeTimer(startTime, endTime) {
+                $('#timerDisplay').show();
+                updateTimerDisplay(startTime, endTime);
+                
+                // Update timer every second
+                timerInterval = setInterval(function() {
+                    updateTimerDisplay(startTime, endTime);
+                }, 1000);
+            }
+            
+            function updateTimerDisplay(startTime, endTime) {
+                const now = Date.now();
+                const start = parseInt(startTime);
+                const end = parseInt(endTime);
+                
+                if (now < start) {
+                    // Room hasn't started yet
+                    const timeLeft = start - now;
+                    const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+                    const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                    const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+                    
+                    $('#timerText').text(`방 시작까지: ${hours}시간 ${minutes}분 ${seconds}초`);
+                    $('#timerText').css('color', '#ffc107');
+                } else if (now >= end) {
+                    // Room has ended
+                    $('#timerText').text('방이 종료되었습니다');
+                    $('#timerText').css('color', '#dc3545');
+                    if (timerInterval) {
+                        clearInterval(timerInterval);
+                        timerInterval = null;
+                    }
+                } else {
+                    // Room is active
+                    const timeLeft = end - now;
+                    const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+                    const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                    const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+                    
+                    $('#timerText').text(`방 종료까지: ${hours}시간 ${minutes}분 ${seconds}초`);
+                    $('#timerText').css('color', '#28a745');
+                }
+            }
+
+            // Clipboard paste functionality
+            $(document).on('paste', function(e) {
+                var clipboardData = e.originalEvent.clipboardData;
+                if (clipboardData && clipboardData.items) {
+                    for (var i = 0; i < clipboardData.items.length; i++) {
+                        var item = clipboardData.items[i];
+                        if (item.type.indexOf('image') !== -1) {
+                            var file = item.getAsFile();
+                            if (file) {
+                                var reader = new FileReader();
+                                reader.onload = function(event) {
+                                    var imageSrc = event.target.result;
+                                    resizeImage(imageSrc, 300, 300, function (resizedImage) {
+                                        var base64Image = resizedImage.split(',')[1];
+                                        var uniqueTime = Date.now();
+                                        console.log('Sending pasted image to room:', roomId);
+                                        socket.emit('base64', { roomId, base64: base64Image, msg_time: uniqueTime });
+                                        
+                                        // Show in my chat
+                                        var msgLine = $('<div class="msgLine">');
+                                        var msgBox = $('<div class="msgBox_mychat" id="msg-' + uniqueTime + '">');
+                                        var img = $('<img>');
+                                        img.attr('src', 'data:img/png;base64,' + base64Image);
+                                        msgBox.append(img);
+                                        msgBox.css('display', 'inline-block');
+                                        msgBox.css('max-width', '100%');
+                                        msgBox.css('height', 'auto');
+                                        msgBox.css('width', 'auto');
+                                        
+                                        var reactionButtons = $('<div class="reaction-buttons">');
+                                        var likeCountSelfImg = $('<span class="like-count" id="like-count-' + uniqueTime + '">0</span>');
+                                        var dislikeCountSelfImg = $('<span class="dislike-count" id="dislike-count-' + uniqueTime + '">0</span>');
+                                        var commentBtnSelfImg = $('<span class="commentBtn" style="cursor:pointer; margin-left:6px;">💬</span>').click(function(){
+                                            toggleReplyMode('msg-' + uniqueTime, myAlias);
+                                        });
+                                        reactionButtons
+                                            .append('👍 ').append(likeCountSelfImg)
+                                            .append('  ')
+                                            .append('👎 ').append(dislikeCountSelfImg)
+                                            .append('  ').append(commentBtnSelfImg);
+                                        msgBox.append(reactionButtons);
+                                        msgLine.css('text-align', 'right');
+                                        msgLine.append(msgBox);
+                                        $('#chatContent').append(msgLine);
+                                        $('#chatContent').append('<div class="replyContainer" id="reply-container-msg-' + uniqueTime + '"></div>');
+                                        updateScroll();
+                                    });
+                                };
+                                reader.readAsDataURL(file);
+                            }
+                        }
+                    }
+                }
+            });
+
+        });
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>채팅방 목록</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@flaticon/flaticon-uicons/css/all/all.css">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+</head>
+<body class="p-4">
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3 class="mb-0"><img src="/chat_title.jpg" alt="Logo" style="max-width: 150px; height: auto; padding: 10px; transition: opacity 0.3s;" 
+                onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'" /></h3>
+            <div id="authArea" style="display: none;"></div>
+        </div>
+
+        <form id="createForm" class="mb-4" method="post" action="/api/rooms" style="display:none;">
+            <div class="form-row">
+                <div class="col-md-3 mb-2">
+                    <input class="form-control" type="text" name="name" placeholder="방 이름" required />
+                </div>
+                <div class="col-md-3 mb-2">
+                    <input class="form-control" type="password" name="password" placeholder="방 비밀번호" required />
+                </div>
+                <div class="col-md-3 mb-2">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="useYoutube" name="useYoutube">
+                        <label class="form-check-label" for="useYoutube">
+                            유튜브 영상 사용
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <button class="btn btn-primary btn-block" type="submit">방 만들기</button>
+                </div>
+            </div>
+            
+            <!-- Timer Section -->
+            <div id="timerSection" class="mt-3" style="display:none;">
+                <div class="form-row">
+                    <div class="col-md-12 mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="isRepeating" name="isRepeating">
+                            <label class="form-check-label" for="isRepeating">
+                                반복 일정 사용 (매주 같은 시간에 운영)
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Single Timer -->
+                <div id="singleTimerSection">
+                    <div class="form-row">
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label">시작 시간</label>
+                            <input class="form-control" type="datetime-local" name="startTime" id="startTimeInput" />
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label">종료 시간</label>
+                            <input class="form-control" type="datetime-local" name="endTime" id="endTimeInput" />
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Repeat Schedule -->
+                <div id="repeatScheduleSection" style="display:none;">
+                    <div class="form-row">
+                        <div class="col-md-12 mb-2">
+                            <label class="form-label">요일별 운영 시간 설정</label>
+                            <div id="repeatDaysContainer">
+                                <!-- Repeat days will be added here -->
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="addRepeatDay">요일 추가</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Timer Toggle -->
+            <div class="form-row">
+                <div class="col-md-12 mb-2">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="useTimer" name="useTimer">
+                        <label class="form-check-label" for="useTimer">
+                            타이머 사용
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </form>
+
+        <table class="table table-striped">
+            <thead>
+                <tr><th>만든이</th><th>방 이름</th><th>교수님이 채팅방 만드신 시간</th><th>채팅방 운영 시간</th><th>참여자 수</th><th></th></tr>
+            </thead>
+            <tbody id="roomsBody"></tbody>
+        </table>
+    </div>
+
+    <!-- Timer Edit Modal -->
+    <div id="timerEditModal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+        <div class="modal-content" style="background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 600px; border-radius: 5px;">
+            <span class="close" style="color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer;">&times;</span>
+            <h3>타이머 설정 수정</h3>
+            <form id="timerEditForm">
+                <input type="hidden" id="editRoomId" name="roomId" />
+                <div class="form-group">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="editUseTimer" name="useTimer">
+                        <label class="form-check-label" for="editUseTimer">
+                            타이머 사용
+                        </label>
+                    </div>
+                </div>
+                
+                <div id="editTimerSection" style="display: none;">
+                    <div class="form-group">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="editIsRepeating" name="isRepeating">
+                            <label class="form-check-label" for="editIsRepeating">
+                                반복 일정 사용
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Single Timer -->
+                    <div id="editSingleTimerSection">
+                        <div class="form-row">
+                            <div class="col-md-6">
+                                <label class="form-label">시작 시간</label>
+                                <input class="form-control" type="datetime-local" name="startTime" id="editStartTimeInput" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">종료 시간</label>
+                                <input class="form-control" type="datetime-local" name="endTime" id="editEndTimeInput" />
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Repeat Schedule -->
+                    <div id="editRepeatScheduleSection" style="display: none;">
+                        <div class="form-group">
+                            <label class="form-label">요일별 운영 시간 설정</label>
+                            <div id="editRepeatDaysContainer">
+                                <!-- Repeat days will be added here -->
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="editAddRepeatDay">요일 추가</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group" style="margin-top: 20px;">
+                    <button type="submit" class="btn btn-primary">저장</button>
+                    <button type="button" class="btn btn-secondary" id="cancelTimerEdit">취소</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function fmt(ts){
+            const d = new Date(ts); return d.toLocaleString();
+        }
+        function render(list){
+            const $b = $('#roomsBody').empty();
+            list.forEach(r=>{
+                const tr = $('<tr>');
+                tr.append('<td>'+(r.ownerName || '알 수 없음')+' 교수님</td>');
+                tr.append('<td>'+r.name+'</td>');
+                tr.append('<td>'+fmt(r.createdAt)+'</td>');
+                
+                // Timer information
+                let timerInfo = '상시 운영';
+                let canJoin = true;
+                
+                if (r.isRepeating && r.repeatSchedule) {
+                    // Repeat schedule
+                    try {
+                        const schedule = JSON.parse(r.repeatSchedule);
+                        if (schedule && schedule.length > 0) {
+                            const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+                            const timeDetails = schedule.map(day => {
+                                const dayName = dayNames[day.dayOfWeek];
+                                const startTime = day.startTime || '00:00';
+                                const endTime = day.endTime || '23:59';
+                                return `${dayName} ${startTime}-${endTime}`;
+                            }).join(', ');
+                            timerInfo = '반복 운영 (' + timeDetails + ')';
+                        } else {
+                            timerInfo = '반복 운영';
+                        }
+                    } catch (e) {
+                        timerInfo = '반복 운영';
+                    }
+                } else if (r.startTime && r.endTime) {
+                    // Single timer
+                    const now = Date.now();
+                    const start = r.startTime;
+                    const end = r.endTime;
+                    
+                    if (now < start) {
+                        timerInfo = '시작 예정: ' + fmt(start);
+                        canJoin = false;
+                    } else if (now > end) {
+                        timerInfo = '종료됨: ' + fmt(end);
+                        canJoin = false;
+                    } else {
+                        timerInfo = '운영 중: ~' + fmt(end);
+                    }
+                }
+                
+                // For non-logged-in users, hide rooms that can't be joined
+                if (!window.__me || !window.__me.loggedIn) {
+                    if (!canJoin) {
+                        return; // Skip this room
+                    }
+                    // Hide detailed timer information for non-logged-in users, but show repeat schedule
+                    if (r.isRepeating && r.repeatSchedule) {
+                        // Keep repeat schedule info for non-logged-in users
+                        try {
+                            const schedule = JSON.parse(r.repeatSchedule);
+                            if (schedule && schedule.length > 0) {
+                                const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+                                const timeDetails = schedule.map(day => {
+                                    const dayName = dayNames[day.dayOfWeek];
+                                    const startTime = day.startTime || '00:00';
+                                    const endTime = day.endTime || '23:59';
+                                    return `${dayName} ${startTime}-${endTime}`;
+                                }).join(', ');
+                                timerInfo = timeDetails ;
+                            } else {
+                                timerInfo = '반복 운영';
+                            }
+                        } catch (e) {
+                            timerInfo = '반복 운영';
+                        }
+                    } else {
+                        timerInfo = '상시 운영';
+                    }
+                }
+                
+                tr.append('<td>'+timerInfo+'</td>');
+                tr.append('<td style="color: #6c757d;">' + (r.participantCount || 0) + '명</td>');
+                
+                const btn = $('<button class="btn btn-sm btn-primary mr-2">입장</button>').click(()=>{
+                    const pw = prompt('방 비밀번호를 입력하세요');
+                    if(!pw) return;
+                    location.href = '/room/'+r.id+'?pw='+encodeURIComponent(pw);
+                });
+                const cell = $('<td>');
+                cell.append(btn);
+                if(window.__me && window.__me.loggedIn && window.__me.email && r.ownerEmail === window.__me.email){
+                    const editTimerBtn = $('<button class="btn btn-sm btn-outline-success mr-2" type="button">타이머 수정</button>').click(()=>{
+                        openTimerEditModal(r);
+                    });
+                    cell.append(editTimerBtn);
+                    
+                    const del = $('<form method="post" action="/api/rooms/'+r.id+'/delete" style="display:inline;">\
+                        <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm(\'이 방을 삭제할까요?\')">삭제</button></form>');
+                    cell.append(del);
+                }
+                tr.append(cell);
+                $b.append(tr);
+            });
+        }
+
+        // Handle Timer checkbox toggle
+        $('#useTimer').change(function() {
+            if ($(this).is(':checked')) {
+                $('#timerSection').show();
+                // Set default start time to now + 1 minute
+                const now = new Date();
+                now.setMinutes(now.getMinutes() + 1);
+                const startTime = now.toISOString().slice(0, 16);
+                $('#startTimeInput').val(startTime);
+                
+                // Set default end time to now + 1 hour
+                const endTime = new Date(now.getTime() + 60 * 60 * 1000);
+                const endTimeStr = endTime.toISOString().slice(0, 16);
+                $('#endTimeInput').val(endTimeStr);
+            } else {
+                $('#timerSection').hide();
+            }
+        });
+
+        // Handle Repeat checkbox toggle
+        $('#isRepeating').change(function() {
+            if ($(this).is(':checked')) {
+                $('#singleTimerSection').hide();
+                $('#repeatScheduleSection').show();
+            } else {
+                $('#singleTimerSection').show();
+                $('#repeatScheduleSection').hide();
+            }
+        });
+
+        // Add repeat day functionality
+        let repeatDayCount = 0;
+        $('#addRepeatDay').click(function() {
+            const dayNames = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+            const dayId = 'repeatDay' + repeatDayCount;
+            
+            const dayDiv = $('<div class="repeat-day-item mb-2 p-2 border rounded" id="' + dayId + '" style="display: flex; align-items: center; gap: 10px;">');
+            
+            // 요일 선택
+            const daySelect = $('<select class="form-control day-select" name="repeatDays[' + repeatDayCount + '][dayOfWeek]" style="width: 120px;">');
+            for (let i = 0; i < 7; i++) {
+                daySelect.append('<option value="' + i + '">' + dayNames[i] + '</option>');
+            }
+            dayDiv.append(daySelect);
+            
+            // 시작 시간
+            const startTimeInput = $('<input type="time" class="form-control" name="repeatDays[' + repeatDayCount + '][startTime]" placeholder="시작 시간" style="width: 150px;">');
+            dayDiv.append(startTimeInput);
+            
+            // 종료 시간
+            const endTimeInput = $('<input type="time" class="form-control" name="repeatDays[' + repeatDayCount + '][endTime]" placeholder="종료 시간" style="width: 150px;">');
+            dayDiv.append(endTimeInput);
+            
+            // 삭제 버튼
+            const removeBtn = $('<button type="button" class="btn btn-sm btn-outline-danger remove-day">삭제</button>');
+            dayDiv.append(removeBtn);
+            
+            $('#repeatDaysContainer').append(dayDiv);
+            repeatDayCount++;
+            
+            // Remove day functionality
+            removeBtn.click(function() {
+                dayDiv.remove();
+            });
+        });
+
+        // Form submission - convert repeat schedule to JSON
+        $('#createForm').submit(function(e) {
+            if ($('#useTimer').is(':checked') && $('#isRepeating').is(':checked')) {
+                const repeatDays = [];
+                $('.repeat-day-item').each(function() {
+                    const dayOfWeek = $(this).find('.day-select').val();
+                    const startTime = $(this).find('input[name*="startTime"]').val();
+                    const endTime = $(this).find('input[name*="endTime"]').val();
+                    
+                    if (startTime && endTime) {
+                        repeatDays.push({
+                            dayOfWeek: parseInt(dayOfWeek),
+                            startTime: startTime,  // "14:30" 형태 그대로
+                            endTime: endTime       // "16:00" 형태 그대로
+                        });
+                    }
+                });
+                
+                if (repeatDays.length === 0) {
+                    alert('최소 하나의 요일을 설정해주세요.');
+                    e.preventDefault();
+                    return;
+                }
+                
+                // Add hidden input for repeat schedule
+                $('<input>').attr({
+                    type: 'hidden',
+                    name: 'repeatSchedule',
+                    value: JSON.stringify(repeatDays)
+                }).appendTo('#createForm');
+            }
+        });
+
+        // Timer edit functionality
+        let editRepeatDayCount = 0;
+
+        function openTimerEditModal(room) {
+            $('#editRoomId').val(room.id);
+            populateTimerEditForm(room);
+            $('#timerEditModal').show();
+        }
+
+        // Close modal
+        $('.close, #cancelTimerEdit').click(function() {
+            $('#timerEditModal').hide();
+        });
+
+        // Timer checkbox toggle
+        $('#editUseTimer').change(function() {
+            if ($(this).is(':checked')) {
+                $('#editTimerSection').show();
+            } else {
+                $('#editTimerSection').hide();
+            }
+        });
+
+        // Repeat checkbox toggle
+        $('#editIsRepeating').change(function() {
+            if ($(this).is(':checked')) {
+                $('#editSingleTimerSection').hide();
+                $('#editRepeatScheduleSection').show();
+            } else {
+                $('#editSingleTimerSection').show();
+                $('#editRepeatScheduleSection').hide();
+            }
+        });
+
+        // Add repeat day
+        $('#editAddRepeatDay').click(function() {
+            addEditRepeatDay();
+        });
+
+        // Form submission
+        $('#timerEditForm').submit(function(e) {
+            e.preventDefault();
+            
+            const roomId = $('#editRoomId').val();
+            const formData = {
+                useTimer: $('#editUseTimer').is(':checked'),
+                startTime: $('#editStartTimeInput').val(),
+                endTime: $('#editEndTimeInput').val(),
+                isRepeating: $('#editIsRepeating').is(':checked')
+            };
+            
+            // Use datetime-local values as-is
+            formData.startTime = $('#editStartTimeInput').val();
+            formData.endTime = $('#editEndTimeInput').val();
+            
+            console.log('Submitting timer edit form:', formData);
+
+            if (formData.useTimer && formData.isRepeating) {
+                const repeatDays = [];
+                $('.edit-repeat-day-item').each(function() {
+                    const dayOfWeek = $(this).find('.day-select').val();
+                    const startTime = $(this).find('input[name*="startTime"]').val();
+                    const endTime = $(this).find('input[name*="endTime"]').val();
+                    
+                    if (startTime && endTime) {
+                        repeatDays.push({
+                            dayOfWeek: parseInt(dayOfWeek),
+                            startTime: startTime,  // "14:30" 형태 그대로
+                            endTime: endTime       // "16:00" 형태 그대로
+                        });
+                    }
+                });
+                
+                if (repeatDays.length === 0) {
+                    alert('최소 하나의 요일을 설정해주세요.');
+                    return;
+                }
+                
+                formData.repeatSchedule = JSON.stringify(repeatDays);
+            }
+
+            // Submit to server
+            $.ajax({
+                url: '/api/rooms/' + roomId + '/timer',
+                method: 'POST',
+                data: formData,
+                success: function(response) {
+                    alert('타이머 설정이 저장되었습니다.');
+                    $('#timerEditModal').hide();
+                    // Refresh room list
+                    $.get('/api/rooms').done(render).fail(()=>alert('방 목록을 불러오지 못했습니다'));
+                },
+                error: function(xhr) {
+                    alert('오류: ' + (xhr.responseText || '알 수 없는 오류'));
+                }
+            });
+        });
+
+        function populateTimerEditForm(room) {
+            console.log('Populating timer form with room data:', room);
+            
+            // Reset form
+            $('#editUseTimer').prop('checked', false);
+            $('#editIsRepeating').prop('checked', false);
+            $('#editStartTimeInput').val('');
+            $('#editEndTimeInput').val('');
+            $('#editRepeatDaysContainer').empty();
+            editRepeatDayCount = 0;
+            
+            if (room.startTime || room.isRepeating) {
+                $('#editUseTimer').prop('checked', true);
+                
+                if (room.isRepeating && room.repeatSchedule) {
+                    // Repeat schedule
+                    $('#editIsRepeating').prop('checked', true);
+                    try {
+                        const schedule = JSON.parse(room.repeatSchedule);
+                        schedule.forEach(day => {
+                            addEditRepeatDay(day);
+                        });
+                    } catch (e) {
+                        console.error('Error parsing repeat schedule:', e);
+                    }
+                } else if (room.startTime && room.endTime) {
+                    // Single timer - check if it's a timestamp or datetime string
+                    $('#editIsRepeating').prop('checked', false);
+                    
+                    if (typeof room.startTime === 'number' || /^\d+$/.test(room.startTime)) {
+                        // It's a timestamp, convert to datetime-local format
+                        const startDate = new Date(parseInt(room.startTime));
+                        const endDate = new Date(parseInt(room.endTime));
+                        
+                        // Convert to local time for datetime-local input
+                        const startLocal = new Date(startDate.getTime() - (startDate.getTimezoneOffset() * 60000));
+                        const endLocal = new Date(endDate.getTime() - (endDate.getTimezoneOffset() * 60000));
+                        
+                        $('#editStartTimeInput').val(startLocal.toISOString().slice(0, 16));
+                        $('#editEndTimeInput').val(endLocal.toISOString().slice(0, 16));
+                    } else {
+                        // It's already a datetime string, use as-is
+                        $('#editStartTimeInput').val(room.startTime);
+                        $('#editEndTimeInput').val(room.endTime);
+                    }
+                }
+            }
+            
+            // Trigger change events
+            $('#editUseTimer').trigger('change');
+            $('#editIsRepeating').trigger('change');
+        }
+
+        function addEditRepeatDay(dayData) {
+            const dayNames = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+            const dayId = 'editRepeatDay' + editRepeatDayCount;
+            
+            const dayDiv = $('<div class="edit-repeat-day-item mb-2 p-2 border rounded" id="' + dayId + '" style="display: flex; align-items: center; gap: 10px;">');
+            
+            // 요일 선택
+            const daySelect = $('<select class="form-control day-select" name="repeatDays[' + editRepeatDayCount + '][dayOfWeek]" style="width: 120px;">');
+            for (let i = 0; i < 7; i++) {
+                const selected = dayData && dayData.dayOfWeek == i ? 'selected' : '';
+                daySelect.append('<option value="' + i + '" ' + selected + '>' + dayNames[i] + '</option>');
+            }
+            dayDiv.append(daySelect);
+            
+            // 시작 시간
+            let startTime = '';
+            if (dayData && dayData.startTime) {
+                if (dayData.startTime.includes('T')) {
+                    // It's a datetime string, extract time part
+                    startTime = new Date(dayData.startTime).toTimeString().slice(0, 5);
+                } else {
+                    // It's already a time string like "14:30"
+                    startTime = dayData.startTime;
+                }
+            }
+            const startTimeInput = $('<input type="time" class="form-control" name="repeatDays[' + editRepeatDayCount + '][startTime]" value="' + startTime + '" style="width: 150px;">');
+            dayDiv.append(startTimeInput);
+            
+            // 종료 시간
+            let endTime = '';
+            if (dayData && dayData.endTime) {
+                if (dayData.endTime.includes('T')) {
+                    // It's a datetime string, extract time part
+                    endTime = new Date(dayData.endTime).toTimeString().slice(0, 5);
+                } else {
+                    // It's already a time string like "16:00"
+                    endTime = dayData.endTime;
+                }
+            }
+            const endTimeInput = $('<input type="time" class="form-control" name="repeatDays[' + editRepeatDayCount + '][endTime]" value="' + endTime + '" style="width: 150px;">');
+            dayDiv.append(endTimeInput);
+            
+            // 삭제 버튼
+            const removeBtn = $('<button type="button" class="btn btn-sm btn-outline-danger remove-day">삭제</button>');
+            dayDiv.append(removeBtn);
+            
+            $('#editRepeatDaysContainer').append(dayDiv);
+            editRepeatDayCount++;
+            
+            // Remove day functionality
+            removeBtn.click(function() {
+                dayDiv.remove();
+            });
+        }
+
+        $.get('/api/me').done(function(me){
+            window.__me = me || {};
+            if(me && me.loggedIn){
+                $('#authArea').html('<form method="post" action="/logout"><button class="btn btn-outline-secondary btn-sm" type="submit">로그아웃</button></form>').show();
+                $('#createForm').show();
+            } else {
+                // 로그인하지 않은 사용자는 authArea 숨김
+                $('#authArea').hide();
+                $('#createForm').hide();
+            }
+        }).always(function(){
+            $.get('/api/rooms').done(render).fail(()=>alert('방 목록을 불러오지 못했습니다'));
+            
+            // 5초마다 방 목록을 새로고침하여 참여자 수 업데이트
+            setInterval(function() {
+                $.get('/api/rooms').done(render).fail(()=>{});
+            }, 5000);
+        });
+    </script>
+
+    <!-- Footer -->
+    <footer style="background-color: #2c3e50; gap: 400px; width: 100%; color: white; bottom: 0; padding: 20px; position: fixed; left: 0; display: flex; justify-content: center; align-items: center; font-family: Arial, sans-serif; border-radius: 5px 5px 0 0;">
+    
+        <!-- 왼쪽 정보란 -->
+        <div style="text-align: left; line-height: 1.6; ">
+            <p style="margin: 0; font-size: 15px;"><i class="fi fi-rr-envelope"></i> Email: jhrew@duksung.ac.kr</p>
+            <p style="margin: 0; font-size: 15px;"><i class="fi fi-rr-phone-call"></i> Address: 01369 Samyang-Ro, Dobong-Gu, Seoul, Korea</p>
+        </div>
+        
+        <!-- 오른쪽 made by -->
+        <div style="text-align: right;">
+            <p style="margin: 0; font-size: 20px; margin-bottom: 10px;">
+                Made by &nbsp;
+                <a href="https://lab.researchwho.com/DSWU-DMKD/" target="_blank" style="text-decoration: none;">
+                    <img src="/DMKD_logo.jpg" alt="Logo" style="max-width: 90px; height: auto; border-radius: 5px; transition: opacity 0.3s;" 
+                         onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'" />
+                </a>
+            </p>
+        </div>
+    </footer>
+    
+
+</body>
+</html>
+

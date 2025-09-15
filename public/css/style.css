@@ -1,0 +1,324 @@
+@import url(//fonts.googleapis.com/earlyaccess/jejugothic.css);
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Jeju Gothic', sans-serif;
+    background-color: #f0f2f5;
+    color: #333;
+}
+
+.fullscreen {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.top_screen {
+    flex: 0 0 10%;
+    background-color: #ffffff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+}
+
+.main_content {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.left_screen {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    background-color: #f9fbfd;
+    overflow-y: hidden;
+    border-right: 1px solid #e6ecf1;
+}
+
+.right_screen {
+    flex: 0 0 20%;
+    padding: 10px;
+    background-color: #ffffff;
+    overflow-y: auto;
+}
+
+.title {
+    color: #333;
+    margin-bottom: 10px;
+}
+
+.notification {
+    background-color: #ffffff;
+    border-left: 4px solid #0064ff;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    color: #333;
+    position: relative;
+}
+
+.notification .closebtn {
+    position: absolute;
+    top: 50%;
+    right: 15px;
+    transform: translateY(-50%);
+    color: #999;
+    font-size: 20px;
+    cursor: pointer;
+}
+
+.notification .closebtn:hover {
+    color: #666;
+}
+
+.form_text,
+.form_image {
+    display: flex;
+    align-items: center;
+    margin-top: 10px;
+}
+
+.form_text input {
+    flex: 1;
+    margin-right: 10px;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+}
+
+input[type='text']:focus {
+    border-color: #0064ff;
+}
+
+.form_image .input-group {
+    width: 100%;
+}
+
+.form-control {
+    justify-content: center;
+    align-items: center;
+    height: 2.8rem;
+}
+#chatBox {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#chatContent {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+    background-color: #ffffff;
+    border-radius: 20px;
+}
+
+.msgLine {
+    margin: 10px 0;
+    display: flex;
+    justify-content: left;
+}
+
+.msgBox {
+    border: 1px solid #ddd;
+    background: #f1f1f1;
+    padding: 10px;
+    border-radius: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    max-width: 50%;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+.msgBox_login {
+    background: none;
+    font-size: 12px;
+    padding: 5px;
+    border-radius: 20px;
+    max-width: 70%;
+    
+    color: #333;
+    text-align: center;
+    margin: 0 auto;
+}
+
+.msgBox_mychat {
+    border: 1px solid #0064ff;
+    background: #0064ff;
+    color: #fff;
+    padding: 10px;
+    border-radius: 20px;
+    max-width: 50%;
+    word-wrap: break-word;
+    margin-left: auto;
+    text-align: left;
+    white-space: pre-wrap;
+}
+.reaction-buttons {
+    margin-top: 5px;
+}
+.msgBox img {
+    max-width: 100%;
+    border-radius: 10px;
+    margin-top: 10px;
+    margin-top: 5px;
+}
+
+.msgBox_from_and_time {
+    color: #666;
+    font-size: 14px;
+    font-weight: bold;
+    margin-top: 5px;
+}
+
+.btn-primary {
+    background-color: #0064ff;
+    border-color: #0064ff;
+}
+
+.btn-primary:hover {
+    background-color: #0056cc;
+    border-color: #0056cc;
+}
+
+#imagePreviewContainer {
+    text-align: center;
+}
+
+.like-btn,
+.dislike-btn {
+    cursor: pointer;
+    color: blue;
+    margin: 0 5px;
+}
+.like-btn:hover,
+.dislike-btn:hover {
+    color: darkblue;
+}
+
+.commentImg {
+    cursor: pointer;
+    width: 20px;
+    height: 20px;
+    margin-left: 5px;
+}
+
+.comment {
+    margin-top: 5px;
+    background: #f1f1f1;
+    padding: 5px;
+    border-radius: 10px;
+    margin-left: 2%;
+}
+
+.btn-success {
+    background-color: #28a745;
+    border-color: #28a745;
+}
+
+.btn-success:hover {
+    background-color: #218838;
+    border-color: #1e7e34;
+}
+
+.replyContainer {
+    margin-top: 10px;
+}
+
+.comment {
+    border: 1px solid #0064ff;
+    background: #0064ff;
+    color: #fff;
+    padding: 10px;
+    border-radius: 20px;
+    max-width: 50%;
+    word-wrap: break-word;
+    margin-left: 20px;
+}
+
+/* 사용자 댓글과 답글을 파란색 배경으로 변경 */
+.msgBox_mychat {
+    border: 1px solid #0064ff;
+    background: #0064ff;
+    color: #fff;
+    padding: 10px;
+    border-radius: 20px;
+    max-width: 50%;
+    word-wrap: break-word;
+    margin-left: auto;
+    text-align: left;
+    white-space: pre-wrap;
+}
+
+.comment_mychat {
+    border: 1px solid #0064ff;
+    background: #0064ff;
+    color: #fff;
+    padding: 10px;
+    border-radius: 20px;
+    max-width: 50%;
+    word-wrap: break-word;
+    margin-left: 20px;
+    margin-top: 5px;
+}
+
+/* 댓글을 세로로 정렬 */
+.replyContainer {
+    display: flex;
+    flex-direction: column;
+    margin: 15px 0; /* Ensure 15px gap from the parent comment */
+}
+
+.comment {
+    border: 1px solid #f1f1f1;
+    background: #f1f1f1;
+    color: #000;
+    padding: 10px;
+    border-radius: 20px;
+    word-wrap: break-word;
+    margin: 5px 15px; /* Ensure 15px gap between comments */
+    display: inline-block;
+    max-width: 80%; /* Ensure the comment doesn't take the full width */
+    white-space: pre-wrap;
+}
+
+.comment .msgBox_from_and_time {
+    color: inherit;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.myComment {
+    background-color: #0064ff;
+    color: #fff;
+    text-align: left; /* Text inside the box should be left aligned */
+}
+
+.rightAlign {
+    margin-left: auto;
+    margin-right: 15px;
+}
+
+.leftAlign {
+    margin-left: 15px;
+    margin-right: auto;
+}
+
+
+
+
+
+
+
+
+
+
+
